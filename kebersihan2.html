@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+    <title>Pasukan Antibodi vs Virus</title>
+    <style>
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+        body {
+            font-family: 'Comic Sans MS', sans-serif;
+            background: #1a252f;
+            margin: 0; padding: 0;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+        }
+        #game-container {
+            width: 100%; max-width: 800px; height: 100vh; max-height: 650px;
+            background: linear-gradient(to bottom, #0f172a, #1e293b);
+            position: relative; overflow: hidden;
+        }
+        :-webkit-full-screen #game-container { max-width: 100%; max-height: 100vh; }
+        :-moz-full-screen #game-container { max-width: 100%; max-height: 100vh; }
+        :fullscreen #game-container { max-width: 100%; max-height: 100vh; }
+
+        canvas { display: block; width: 100%; height: 100%; background: transparent; }
+        .ui-panel {
+            position: absolute; top: 15px; left: 15px; right: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            pointer-events: none; z-index: 5;
+        }
+        .score-box {
+            background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(5px);
+            padding: 8px 15px; border-radius: 20px; color: #fff;
+            font-size: 1rem; font-weight: bold; border: 2px solid rgba(255,255,255,0.3);
+        }
+        .btn-fs-inner {
+            pointer-events: auto; background: #f1c40f; color: #2c3e50; border: none; 
+            padding: 6px 14px; font-weight: bold; border-radius: 15px; cursor: pointer; 
+            font-family: inherit; font-size: 0.9rem; box-shadow: 0 3px 0 #d35400;
+        }
+        .mobile-controls {
+            position: absolute; bottom: 25px; left: 0; right: 0;
+            display: flex; justify-content: space-between; padding: 0 40px; z-index: 5;
+        }
+        .ctrl-btn {
+            width: 80px; height: 80px; background: rgba(255, 255, 255, 0.25);
+            border: 4px solid #fff; border-radius: 50%; color: white; font-size: 2.5rem;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+            box-shadow: 0 5px 12px rgba(0,0,0,0.4); touch-action: none;
+        }
+        .ctrl-btn:active { background: rgba(255,255,255,0.6); }
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(26, 37, 48, 0.95); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 10; color: white; text-align: center; padding: 20px;
+        }
+        .screen h1 { font-size: 2.2rem; color: #e74c3c; margin: 0 0 10px 0; text-shadow: 2px 2px #f1c40f; }
+        .screen p { font-size: 1.1rem; max-width: 500px; margin-bottom: 20px; line-height: 1.5; }
+        .btn-play {
+            background: #2ecc71; color: white; border: 4px solid #fff; padding: 12px 40px;
+            font-size: 1.6rem; font-weight: bold; border-radius: 50px; cursor: pointer;
+            box-shadow: 0 5px 0 #27ae60; font-family: inherit;
+        }
+        .btn-play:active { transform: translateY(4px); box-shadow: none; }
+        
+        #level-up-banner {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 3rem; font-weight: bold; color: #f1c40f; text-shadow: 3px 3px #000;
+            z-index: 8; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
+            text-align: center; width: 100%; line-height: 1.2;
+        }
+        .hide { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id='game-container'>
+        <div class='ui-panel'>
+            <div id='info-score' class='score-box'>💥: 0</div>
+            <div id='info-level' class='score-box' style='color:#f1c40f;'>⭐ Lv: 1</div>
+            <button class='btn-fs-inner' onclick='goFullScreen()'>LAYAR PENUH 📺</button>
+            <div id='info-health' class='score-box'>❤️ ❤️ ❤️</div>
+        </div>
+        
+        <div id='level-up-banner'>LEVEL UP! 🎉</div>
+        
+        <canvas id='gameCanvas'></canvas>
+        
+        <div class='mobile-controls'>
+            <div class='ctrl-btn' id='btn-left'>◀️</div>
+            <div class='ctrl-btn' id='btn-shoot' style='background: rgba(46, 204, 113, 0.4); border-color: #2ecc71;'>🧼</div>
+            <div class='ctrl-btn' id='btn-right'>▶️</div>
+        </div>
+        
+        <div id='start-screen' class='screen'>
+            <h1>🛡️ TEMBAK MONSTER VIRUS 🦠</h1>
+            <p>Ayo bantu pasukan antibodi menembak kuman jahat!<br>Gunakan tombol panah untuk bergerak dan tombol sabun untuk menembak.<br><br>🟢 Tembak: Virus & Kuman<br>🍎 Tabrak: Buah & Sayur (Tambah Nyawa + Skor)</p>
+            <button class='btn-play' onclick='startGame()'>MULAI MAIN! 🚀</button>
+        </div>
+        
+        <div id='gameover-screen' class='screen hide'>
+            <h1 style='color:#e74c3c;' id='go-title'>YAH, TUBUH SAKIT... 🤒</h1>
+            <p id='go-body'>Jangan lupa untuk selalu cuci tangan dan makan buah agar antibodimu kuat kembali ya!</p>
+            <h2 id='final-level' style='color:#f1c40f; font-size: 1.5rem; margin: 5px 0;'>Level Terakhir: 1</h2>
+            <h2 id='final-score' style='color:#2ecc71; font-size: 1.8rem; margin: 10px 0;'>Skor Akhir: 0</h2>
+            <button class='btn-play' onclick='resetGame()' style='background:#3498db; box-shadow:0 5px 0 #2980b9;'>MAIN LAGI 🔄</button>
+        </div>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 800; canvas.height = 650;
+        
+        let gameActive = false, score = 0, health = 3, currentLevel = 1, spawnTimer = 0;
+        const player = { x: 370, y: 510, width: 60, height: 60, speed: 10, emoji: '🛡️' };
+        let bullets = [], fallItems = [], keys = {};
+        
+        const levelConfig = {
+            1: { maxScore: 40, speedBase: 0.6, spawnRate: 95, name: 'Level 1: Santai Banget 🍃' },
+            2: { maxScore: 140, speedBase: 1.4, spawnRate: 60, name: 'Level 2: Mulai Seru ⚡' },
+            3: { maxScore: 280, speedBase: 2.2, spawnRate: 48, name: 'Level 3: Lincah 🔥' },
+            4: { maxScore: 450, speedBase: 3.0, spawnRate: 40, name: 'Level 4: Cepat 🌪️' },
+            5: { maxScore: 99999, speedBase: 4.0, spawnRate: 30, name: 'Level 5: Raja Virus! 👑' }
+        };
+
+        const virusTypes = [
+            { emoji: '🦠', type: 'virus', points: 1, size: 40 }, 
+            { emoji: '👾', type: 'virus', points: 2, size: 45 }, 
+            { emoji: '🪰', type: 'virus', points: 1, size: 35 }
+        ];
+        const healthyTypes = [
+            { emoji: '🍎', type: 'vitamin', size: 40 }, 
+            { emoji: '🥦', type: 'vitamin', size: 40 }
+        ];
+
+        // --- SISTEM SUARA DIGITAL WEB AUDIO API ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playShootSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(550, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.08);
+            gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.08);
+        }
+
+        function playEatSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(450, audioCtx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.12);
+        }
+        
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+        
+        let moveLeft = false, moveRight = false;
+        
+        document.getElementById('btn-left').addEventListener('pointerdown', (e) => { e.preventDefault(); moveLeft = true; });
+        document.getElementById('btn-left').addEventListener('pointerup', (e) => { e.preventDefault(); moveLeft = false; });
+        document.getElementById('btn-left').addEventListener('pointerleave', () => moveLeft = false);
+        
+        document.getElementById('btn-right').addEventListener('pointerdown', (e) => { e.preventDefault(); moveRight = true; });
+        document.getElementById('btn-right').addEventListener('pointerup', (e) => { e.preventDefault(); moveRight = false; });
+        document.getElementById('btn-right').addEventListener('pointerleave', () => moveRight = false);
+        
+        document.getElementById('btn-shoot').addEventListener('pointerdown', (e) => { 
+            e.preventDefault(); 
+            shootBullet(); 
+        });
+
+        function goFullScreen() {
+            const elem = document.body;
+            if (elem.requestFullscreen) { elem.requestFullscreen(); }
+            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+            else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function startGame() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            document.getElementById('start-screen').classList.add('hide');
+            gameActive = true; score = 0; health = 3; currentLevel = 1; bullets = []; fallItems = []; updateUI(); animate();
+        }
+
+        function shootBullet() {
+            if (!gameActive) return;
+            bullets.push({ x: player.x + 20, y: player.y, width: 20, height: 20, speed: 12, emoji: '🧼' });
+            playShootSound();
+        }
+        
+        function checkLevelUp() {
+            let config = levelConfig[currentLevel];
+            if (score >= config.maxScore && currentLevel < 5) {
+                currentLevel++;
+                showLevelBanner();
+                updateUI();
+            }
+        }
+
+        function showLevelBanner() {
+            const banner = document.getElementById('level-up-banner');
+            banner.innerText = 'LEVEL ' + currentLevel + '! 🎉\n' + levelConfig[currentLevel].name;
+            banner.style.opacity = '1';
+            setTimeout(() => { banner.style.opacity = '0'; }, 2000);
+        }
+
+        function spawnObjects() {
+            spawnTimer++;
+            let config = levelConfig[currentLevel];
+            if (spawnTimer % config.spawnRate === 0) {
+                let isVirus = Math.random() < 0.75;
+                let template = isVirus ? virusTypes[Math.floor(Math.random() * virusTypes.length)] : healthyTypes[Math.floor(Math.random() * healthyTypes.length)];
+                let speedRandom = Math.random() * 0.7 + config.speedBase;
+                
+                fallItems.push({ 
+                    x: Math.random() * 740, 
+                    y: -50, 
+                    width: template.size, 
+                    height: template.size, 
+                    speed: speedRandom, 
+                    emoji: template.emoji, 
+                    type: template.type, 
+                    points: template.points || 0 
+                });
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('info-score').innerText = '💥: ' + score;
+            document.getElementById('info-level').innerText = '⭐ Lv: ' + currentLevel;
+            let h = ''; for(let i=0; i<3; i++) h += i < health ? '❤️' : '🖤';
+            document.getElementById('info-health').innerText = h;
+        }
+
+        function animate() {
+            if (!gameActive) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (keys['ArrowLeft'] || moveLeft) player.x -= player.speed;
+            if (keys['ArrowRight'] || moveRight) player.x += player.speed;
+            if (player.x < 0) player.x = 0; if (player.x > 740) player.x = 740;
+            if (keys['Space']) { shootBullet(); keys['Space'] = false; }
+            
+            ctx.font = '55px Arial'; ctx.fillText(player.emoji, player.x, player.y + 50);
+            
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i]; b.y -= b.speed;
+                ctx.font = '20px Arial'; ctx.fillText(b.emoji, b.x, b.y + 15);
+                if (b.y < 0) bullets.splice(i, 1);
+            }
+            
+            spawnObjects();
+            
+            for (let i = fallItems.length - 1; i >= 0; i--) {
+                let item = fallItems[i]; item.y += item.speed;
+                ctx.font = item.width + 'px Arial'; ctx.fillText(item.emoji, item.x, item.y + item.width);
+                
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    if (checkCollision(bullets[j], item)) {
+                        if (item.type === 'virus') { 
+                            score += item.points; 
+                            fallItems.splice(i, 1); 
+                            checkLevelUp();
+                        } else { 
+                            fallItems.splice(i, 1); 
+                        }
+                        bullets.splice(j, 1); updateUI(); break;
+                    }
+                }
+                if (!fallItems[i]) continue;
+                if (checkCollision(player, item)) {
+                    if (item.type === 'virus') { 
+                        health--; 
+                    } else { 
+                        if (health < 3) health++; 
+                        score += 1; 
+                        checkLevelUp(); 
+                        playEatSound();
+                    }
+                    updateUI(); fallItems.splice(i, 1);
+                    if (health <= 0) gameOver();
+                }
+                if (item && item.y > canvas.height) {
+                    if (item.type === 'virus') { health--; updateUI(); if (health <= 0) gameOver(); }
+                    fallItems.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        function checkCollision(r1, r2) {
+            return r1.x < r2.x + r2.width && r1.x + r1.width > r2.x && r1.y < r2.y + r2.height && r1.y + r1.height > r2.y;
+        }
+
+        function gameOver() {
+            gameActive = false; 
+            document.getElementById('final-score').innerText = 'Skor Akhir: ' + score;
+            document.getElementById('final-level').innerText = 'Level Terakhir: Level ' + currentLevel;
+            const t = document.getElementById('go-title'), b = document.getElementById('go-body');
+            
+            if(currentLevel >= 4) { 
+                t.innerText = '🏆 TUBUHMU SANGAT KUAT! 🏆'; 
+                t.style.color = '#2ecc71'; 
+                b.innerText = 'Luar biasa! Kamu berhasil bertahan sangat lama dan mengalahkan koloni kuman jahat!'; 
+            } else { 
+                t.innerText = 'YAH, TUBUH JADI SAKIT... 🤒'; 
+                t.style.color = '#e74c3c'; 
+                b.innerText = 'Pertahananmu sudah bagus! Yuk, main lagi dan kumpulkan lebih banyak imun tubuh!'; 
+            }
+            document.getElementById('gameover-screen').classList.remove('hide');
+        }
+
+        function resetGame() { document.getElementById('gameover-screen').classList.add('hide'); startGame(); }
+    </script>
+</body>
+</html>
